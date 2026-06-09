@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>B站AI科普视频总结</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f7;color:#1d1d1f;min-height:100vh}
+.hd{background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);color:#fff;padding:24px 20px 32px;text-align:center}
+.hd h1{font-size:1.5rem;font-weight:700}.hd p{color:rgba(255,255,255,.55);font-size:.82rem;margin-top:4px}
+.ct{max-width:700px;margin:0 auto;padding:0 20px 60px}
+.card{background:#fff;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.08);padding:22px;margin-top:-16px}
+.rw{display:flex;gap:10px;margin-bottom:12px;align-items:center}
+.rw input{flex:1;padding:12px 14px;border:2px solid #e5e5ea;border-radius:8px;font-size:.9rem;outline:none}.rw input:focus{border-color:#0071e3}
+.rw textarea{flex:1;padding:12px 14px;border:2px solid #e5e5ea;border-radius:8px;font-size:.82rem;outline:none;resize:vertical;min-height:60px;font-family:inherit}.rw textarea:focus{border-color:#0071e3}
+.btn{padding:12px 26px;background:#0071e3;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;white-space:nowrap}.btn:disabled{background:#a1a1a6;cursor:not-allowed}
+.btn2{padding:10px 18px;background:transparent;color:#0071e3;border:2px solid #0071e3;border-radius:6px;font-size:.85rem;cursor:pointer}
+.tip{background:#f0f7ff;border-left:3px solid #0071e3;padding:10px 14px;border-radius:0 8px 8px 0;font-size:.8rem;color:#86868b;margin-bottom:12px}
+.prog{margin-top:10px;background:#e5e5ea;border-radius:20px;height:4px}.prog-f{height:100%;background:linear-gradient(90deg,#0071e3,#34c759);border-radius:20px;width:0;transition:width .4s}
+.pmsg{margin-top:4px;font-size:.78rem;color:#86868b;text-align:center}
+.res{display:none;margin-top:24px}.res.on{display:block}
+.tabs{display:flex;border-bottom:2px solid #e5e5ea;margin-bottom:16px}
+.tab{padding:7px 16px;cursor:pointer;font-size:.84rem;color:#86868b;border-bottom:2px solid transparent;margin-bottom:-2px}.tab.on{color:#0071e3;border-bottom-color:#0071e3}
+.pane{display:none}.pane.on{display:block}
+.art{background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:28px}
+.art h2{font-size:1.2rem}.art .sub{color:#86868b;font-size:.78rem;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e5e5ea}
+.md{line-height:1.85;font-size:.9rem}.md h2{font-size:1.1rem;margin:1em 0 .4em;border-bottom:1px solid #e5e5ea;padding-bottom:4px}
+.md h3{font-size:1rem;margin:.7em 0 .3em}.md p{margin:.5em 0}.md strong{color:#1a1a2e}
+.md blockquote{border-left:3px solid #0071e3;padding:5px 12px;margin:8px 0;background:#f5f5f7;border-radius:0 8px 8px 0;color:#86868b}
+.md code{background:#f0f0f5;padding:1px 4px;border-radius:4px;font-family:Consolas,monospace;font-size:.88em}
+.md ol,.md ul{margin:5px 0;padding-left:22px}.md a{color:#0071e3}
+.pbox{background:#1a1a2e;color:#a0a0b0;border-radius:12px;padding:16px;font-family:Consolas,monospace;font-size:.75rem;white-space:pre-wrap;line-height:1.55;max-height:400px;overflow-y:auto}
+.acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:8px 20px;border-radius:20px;font-size:.8rem;z-index:99;opacity:0;transition:opacity .3s}.toast.on{opacity:1}
+@media(max-width:640px){.rw{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="hd"><h1>B站AI科普视频总结</h1><p>输入B站链接 → 自动获取字幕 → AI生成科普短文</p></div>
+<div class="ct">
+<div class="card">
+<div class="tip"><strong>第1步</strong> 填入BV号或完整链接获取字幕，<strong>第2步</strong> AI自动生成总结。API Key 保存在服务端，不暴露。</div>
+<div class="rw"><input type="url" id="u" placeholder="https://www.bilibili.com/video/BV..." autofocus></div>
+<div class="rw"><input type="text" id="t" placeholder="视频标题（自动填充）" readonly></div>
+<div class="rw"><textarea id="txt" placeholder="字幕内容（自动填充）" readonly></textarea></div>
+<button class="btn" id="go" onclick="step1()">第1步: 获取字幕</button>
+<button class="btn" id="go2" onclick="step2()" disabled style="margin-left:8px">第2步: 生成总结</button>
+<div class="prog"><div class="prog-f" id="b"></div></div><div class="pmsg" id="m"></div></div>
+
+<div class="res" id="r"><div class="tabs"><div class="tab on" onclick="sw('a')">科普文章</div><div class="tab" onclick="sw('p')">所用 Prompt</div></div>
+<div class="pane on" id="pa"><div class="art"><h2 id="at"></h2><div class="sub" id="am"></div><div class="md" id="ab"></div>
+<div class="acts"><button class="btn2" onclick="cp()">复制全文</button><button class="btn2" onclick="dl()">下载 .md</button></div></div></div>
+<div class="pane" id="pp"><p style="color:#86868b;margin-bottom:10px;font-size:.82rem">Prompt 在 api/summarize.py 中修改</p><div class="pbox" id="pb"></div></div></div>
+</div>
+<div class="toast" id="to"></div>
+
+<script>
+let subTitle='', subText='';
+
+async function step1(){
+  const u=document.getElementById('u').value.trim();
+  if(!u){tt('请输入B站链接');return}
+  const m=/BV[a-zA-Z0-9]{10}/.exec(u);
+  if(!m){tt('不是有效的B站链接');return}
+  const bv=m[0], btn=document.getElementById('go');
+  btn.disabled=true;btn.textContent='获取中...';
+  document.getElementById('m').textContent='正在从B站API获取字幕...';
+
+  try{
+    const h={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64)','Referer':'https://www.bilibili.com/'};
+    const d1=await (await fetch('https://api.bilibili.com/x/web-interface/view?bvid='+bv,{headers:h})).json();
+    if(d1.code!==0) throw new Error(d1.message||'B站API错误');
+    const cid=d1.data.cid||d1.data.pages[0].cid;
+    document.getElementById('t').value=d1.data.title; subTitle=d1.data.title;
+
+    const d2=await (await fetch('https://api.bilibili.com/x/player/v2?bvid='+bv+'&cid='+cid,{headers:h})).json();
+    const subs=d2.data?.subtitle?.subtitles||[];
+    if(!subs.length) throw new Error('该视频没有字幕');
+
+    let tgt=subs[0];
+    for(const s of subs) if(s.ai_type===1&&['zh-Hans','zh-CN','zh'].includes(s.lan)){tgt=s;break}
+    if(!subs.find(s=>s.ai_type===1&&['zh-Hans','zh-CN','zh'].includes(s.lan)))
+      for(const s of subs) if(['zh-Hans','zh-CN','zh'].includes(s.lan)){tgt=s;break}
+
+    let su=tgt.subtitle_url; if(su.startsWith('//')) su='https:'+su;
+    const d3=await (await fetch(su,{headers:h})).json();
+    const lines=d3.body.filter(i=>i.content?.trim()).map(i=>i.content);
+    subText=lines.join('\n');
+    document.getElementById('txt').value=subText;
+    document.getElementById('m').textContent='字幕获取成功: '+subText.length+'字';
+    document.getElementById('go2').disabled=false;
+    btn.textContent='已获取'; tt('字幕获取成功! 点击第2步');
+  }catch(e){
+    document.getElementById('m').textContent='获取失败: '+e.message;
+    tt('失败: '+e.message); btn.disabled=false; btn.textContent='重试';
+  }
+}
+
+async function step2(){
+  if(!subText){tt('请先获取字幕');return}
+  const url=document.getElementById('u').value.trim();
+  const btn=document.getElementById('go2'); btn.disabled=true; btn.textContent='生成中...';
+  document.getElementById('b').style.width='0%'; document.getElementById('r').classList.remove('on');
+  document.getElementById('m').textContent='正在调用AI生成总结...';
+
+  try{
+    const r=await fetch('/api/summarize',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url,title:subTitle,text:subText})
+    });
+    const d=await r.json();
+    if(d.error){tt(d.error); btn.disabled=false; btn.textContent='重试'; return}
+    document.getElementById('at').textContent=d.title||subTitle;
+    document.getElementById('am').textContent='原文 '+d.chars+' 字 | DeepSeek V3 生成';
+    if(marked){marked.setOptions({breaks:true,gfm:true});document.getElementById('ab').innerHTML=marked.parse(d.article||'')}
+    document.getElementById('pb').textContent=d.prompt||'';
+    document.getElementById('r').classList.add('on');
+    document.getElementById('b').style.width='100%';
+    document.getElementById('m').textContent='完成! '+d.article.length+'字';
+    btn.disabled=false; btn.textContent='重新生成'; tt('完成!');
+    document.getElementById('r').scrollIntoView({behavior:'smooth'});
+    window._article=d.article; window._title=d.title||subTitle;
+  }catch(e){
+    document.getElementById('m').textContent='请求失败: '+e.message;
+    tt('失败: '+e.message); btn.disabled=false; btn.textContent='重试';
+  }
+}
+
+function sw(n){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));event.target.classList.add('on');document.getElementById('p'+n).classList.add('on')}
+function cp(){if(window._article)navigator.clipboard.writeText(window._article).then(()=>tt('已复制'))}
+function dl(){if(!window._article)return;const b=new Blob([window._article],{type:'text/markdown'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(window._title||'summary').slice(0,20)+'.md';a.click()}
+function tt(m){const e=document.getElementById('to');e.textContent=m;e.classList.add('on');setTimeout(()=>e.classList.remove('on'),3000)}
+</script>
+</body>
+</html>
