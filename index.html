@@ -67,13 +67,12 @@ async function step1(){
 
   try{
     const bv=u.match(/BV[a-zA-Z0-9]{10}/)[0];
-    const h={'User-Agent':'Mozilla/5.0','Referer':'https://www.bilibili.com/'};
-    
-    const d1=await fetch('https://api.bilibili.com/x/web-interface/view?bvid='+bv,{headers:h}).then(r=>r.json());
+    const d1=await fetch('https://api.bilibili.com/x/web-interface/view?bvid='+bv).then(r=>r.json());
+    if(d1.code!==0) throw new Error(d1.message);
     const cid=d1.data.cid||d1.data.pages[0].cid;
     document.getElementById('t').value=d1.data.title; subTitle=d1.data.title;
 
-    const d2=await fetch('https://api.bilibili.com/x/player/wbi/v2?bvid='+bv+'&cid='+cid,{headers:h}).then(r=>r.json());
+    const d2=await fetch('https://api.bilibili.com/x/player/wbi/v2?bvid='+bv+'&cid='+cid).then(r=>r.json());
     const subs=d2.data?.subtitle?.subtitles||[];
     if(!subs.length) throw new Error('该视频没有字幕');
 
@@ -82,7 +81,7 @@ async function step1(){
     for(const s of subs){if(['zh-Hans','zh-CN','zh'].includes(s.lan)){tgt=s;break}}
 
     let su=tgt.subtitle_url; if(su.startsWith('//')) su='https:'+su;
-    const d3=await fetch(su,{headers:h}).then(r=>r.json());
+    const d3=await fetch(su).then(r=>r.json());
     const lines=d3.body.filter(i=>i.content?.trim()).map(i=>i.content);
     subText=lines.join('\n');
     document.getElementById('txt').value=subText;
