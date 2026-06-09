@@ -61,34 +61,18 @@ let subTitle='', subText='';
 async function step1(){
   const u=document.getElementById('u').value.trim();
   if(!u){tt('请输入B站链接');return}
-  const m=/BV[a-zA-Z0-9]{10}/.exec(u);
-  if(!m){tt('不是有效的B站链接');return}
-  const bv=m[0], btn=document.getElementById('go');
+  const btn=document.getElementById('go');
   btn.disabled=true;btn.textContent='获取中...';
-  document.getElementById('m').textContent='正在从B站API获取字幕...';
+  document.getElementById('m').textContent='正在从B站获取字幕...';
 
   try{
-    const h={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64)','Referer':'https://www.bilibili.com/'};
-    const d1=await (await fetch('https://api.bilibili.com/x/web-interface/view?bvid='+bv,{headers:h})).json();
-    if(d1.code!==0) throw new Error(d1.message||'B站API错误');
-    const cid=d1.data.cid||d1.data.pages[0].cid;
-    document.getElementById('t').value=d1.data.title; subTitle=d1.data.title;
-
-    const d2=await (await fetch('https://api.bilibili.com/x/player/v2?bvid='+bv+'&cid='+cid,{headers:h})).json();
-    const subs=d2.data?.subtitle?.subtitles||[];
-    if(!subs.length) throw new Error('该视频没有字幕');
-
-    let tgt=subs[0];
-    for(const s of subs) if(s.ai_type===1&&['zh-Hans','zh-CN','zh'].includes(s.lan)){tgt=s;break}
-    if(!subs.find(s=>s.ai_type===1&&['zh-Hans','zh-CN','zh'].includes(s.lan)))
-      for(const s of subs) if(['zh-Hans','zh-CN','zh'].includes(s.lan)){tgt=s;break}
-
-    let su=tgt.subtitle_url; if(su.startsWith('//')) su='https:'+su;
-    const d3=await (await fetch(su,{headers:h})).json();
-    const lines=d3.body.filter(i=>i.content?.trim()).map(i=>i.content);
-    subText=lines.join('\n');
+    const r=await fetch('/api/summarize?url='+encodeURIComponent(u));
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    document.getElementById('t').value=d.title; subTitle=d.title;
+    subText=d.text;
     document.getElementById('txt').value=subText;
-    document.getElementById('m').textContent='字幕获取成功: '+subText.length+'字';
+    document.getElementById('m').textContent='字幕获取成功: '+d.chars+'字';
     document.getElementById('go2').disabled=false;
     btn.textContent='已获取'; tt('字幕获取成功! 点击第2步');
   }catch(e){
