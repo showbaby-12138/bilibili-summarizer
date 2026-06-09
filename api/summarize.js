@@ -7,7 +7,6 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    // ===== GET: 获取B站字幕 =====
     if (req.method === 'GET') {
         const url = new URL(req.url, 'http://localhost').searchParams.get('url');
         if (!url) return res.status(400).json({ error: '缺少url参数' });
@@ -16,18 +15,26 @@ export default async function handler(req, res) {
             const bv = url.match(/BV[a-zA-Z0-9]{10}/)[0];
             const headers = { 'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.bilibili.com/' };
             
-            // 获取视频信息
             const info = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bv}`, { headers }).then(r => r.json());
-            if (info.code !== 0) throw new Error(info.message);
-            const cid = info.data.cid || info.data.pages[0].cid;
-            const title = info.data.title;
+            const cid = info.data?.cid || info.data?.pages?.[0]?.cid;
+            const title = info.data?.title || '';
             
-            // 获取字幕列表
-            const player = await fetch(`https://api.bilibili.com/x/player/v2?bvid=${bv}&cid=${cid}`, { headers }).then(r => r.json());
-            const subs = player.data?.subtitle?.subtitles || [];
-            if (!subs.length) throw new Error('该视频没有字幕');
+            const [r1, r2] = await Promise.all([
+                fetch(`https://api.bilibili.com/x/player/v2?bvid=${bv}&cid=${cid}`, { headers }).then(r => r.json()),
+                fetch(`https://api.bilibili.com/x/player/wbi/v2?bvid=${bv}&cid=${cid}`, { headers }).then(r => r.json())
+            ]);
             
-            // 选最优字幕
+            const subs1 = r1.data?.subtitle?.subtitles || [];
+            const subs2 = r2.data?.subtitle?.subtitles || [];
+            const subs = subs1.length >= subs2.length ? subs1 : subs2;
+            
+            if (!subs.length) {
+                return res.json({ 
+                    error: '该视频没有字幕', 
+                    debug: { cid, subs_v2: subs1.length, subs_wbi: subs2.length, title }
+                });
+            }
+            
             let target = subs[0];
             for (const s of subs) { if (s.ai_type === 1 && ['zh-Hans','zh-CN','zh'].includes(s.lan)) { target = s; break; } }
             for (const s of subs) { if (['zh-Hans','zh-CN','zh'].includes(s.lan)) { target = s; break; } }
@@ -44,7 +51,6 @@ export default async function handler(req, res) {
         }
     }
 
-    // ===== POST: DeepSeek总结 =====
     if (req.method === 'POST') {
         const { title, text } = req.body;
         if (!text) return res.status(400).json({ error: 'no text' });
@@ -61,6 +67,7 @@ export default async function handler(req, res) {
                 body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1800 })
             });
             const data = await resp.json();
+            if (data.error) return res.status(500).json({ error: data.error.message });
             return res.json({ article: data.choices[0].message.content, chars: text.length, title, prompt });
         } catch (e) {
             return res.status(500).json({ error: e.message });
